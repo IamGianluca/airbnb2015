@@ -8,17 +8,21 @@ import pandas as pd
 import numpy as np
 import collections
 
-def create_features():
+def create_features(is_training_set=True):
 
     # set variables
     directory = "/home/gianluca/Kaggle/airbnb2015/data/"
     session_file = "sessions.csv"
-    user_file = "train_users_2.csv"
-    destination_file = "training_features.csv"
+    if is_training_set:
+        user_file = "train_users_2.csv"
+        destination_file = "training_features.csv"
+    else:
+        user_file = "test_users.csv"
+        destination_file = "test_features.csv"
     session_full_path = "".join((directory, session_file))
     user_full_path = "".join((directory, user_file))
     destination_full_path = "".join((directory, destination_file))
-    chunk_size = 100000
+    chunk_size = 10000
 
     # load only 100,000 lines at a time because of memory restrictions (the file weights over 630MB)
     session_data = pd.DataFrame()
@@ -52,7 +56,10 @@ def create_features():
 
     # create user features matrix
     user = pd.read_csv(user_full_path)
-    user_features = user[["id", "age", "signup_flow", "country_destination"]]
+    if is_training_set:
+        user_features = user[["id", "age", "signup_flow", "country_destination"]]
+    else:
+        user_features = user[["id", "age", "signup_flow"]]
 
     # TODO: create features out of 'date_account_created', 'timestamp_first_active', 'date_first_booking'
 
@@ -74,4 +81,4 @@ def create_features():
 
 
 if __name__ == "__main__":
-    create_features()
+    create_features(False)
