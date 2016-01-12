@@ -58,7 +58,8 @@ def predict_decision_tree(model):
     test_data = pd.read_csv(data_file_path)
     result = model.predict(test_data)
 
-    result_file_name = "result.csv"
+    # TODO: need to output results in the required format
+    result_file_name = "results.csv"
     result.to_csv(result_file_name, index=False)
     print("Output saved in", result_file_name)
 
