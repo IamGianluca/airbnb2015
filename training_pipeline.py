@@ -20,6 +20,7 @@ def prepare_dataset():
 
     # separate outcome from independent variables
     y = data.country_destination.tolist()
+    # TODO avoid returning list of features used in training. This should be done in the featurizer
     features = data.columns
     features = [feature for feature in features if feature not in ["id", "country_destination"]]
     X = data.drop(["id", "country_destination"], axis=1).as_matrix()
@@ -27,7 +28,7 @@ def prepare_dataset():
 
     # split into training and test set
     from sklearn.cross_validation import train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
     del X, y
 
     return X_train, X_test, y_train, y_test, features
@@ -36,19 +37,16 @@ def prepare_dataset():
 def train_decision_tree(X_train, X_test, y_train, y_test):
 
     from sklearn import tree
+    from sklearn import cross_validation
 
-    # train decision tree
+    # train decision trees
     clf = tree.DecisionTreeClassifier()
     clf = clf.fit(X_train, y_train)
 
-    # make predictions
-    predictions = clf.predict(X_test)
+    # cross-validation
+    scores = cross_validation.cross_val_score(clf, X_train, y_train, cv=5)
+    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
-    # compute misclassification rate
-    error_rate = (y_test != predictions).mean()
-    print("Misclassifcation error: {0:.2%}".format(error_rate))
-
-    # TODO: fix featurizer in order to avoid returning the training feature names
     return clf
 
 
@@ -115,4 +113,4 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test, features = prepare_dataset()
     model = train_decision_tree(X_train, X_test, y_train, y_test)
-    predict_decision_tree(model, features)
+    # predict_decision_tree(model, features)
