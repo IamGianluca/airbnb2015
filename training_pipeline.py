@@ -40,7 +40,8 @@ def train_decision_tree(X_train, X_test, y_train, y_test):
     from sklearn import cross_validation
 
     # train decision trees
-    clf = tree.DecisionTreeClassifier()
+    # TODO: generally max_depth=3 is a good starting point. Assess if different value could lead to a better CV score
+    clf = tree.DecisionTreeClassifier(max_depth=3)
     clf = clf.fit(X_train, y_train)
 
     # cross-validation
@@ -113,4 +114,4 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test, features = prepare_dataset()
     model = train_decision_tree(X_train, X_test, y_train, y_test)
-    # predict_decision_tree(model, features)
+    predict_decision_tree(model, features)
