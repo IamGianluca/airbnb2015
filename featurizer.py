@@ -8,7 +8,8 @@ import pandas as pd
 import numpy as np
 import collections
 
-def create_features(is_training_set=True):
+
+def create_features(is_training_set=True, training_features=[]):
 
     # set variables
     directory = "/home/gianluca/Kaggle/airbnb2015/data/"
@@ -42,6 +43,10 @@ def create_features(is_training_set=True):
         # remove chunk_session_data to save memory
         del chunk_session_data
         print("I've done with chunk {}".format(n))
+
+    # TODO: get rid of this dirty hack
+    # remove all features not used in training
+    session_data = session_data[[training_features]]
 
     # make sure there is one line for each user_id in the final `session_data` data frame
     """
@@ -79,6 +84,15 @@ def create_features(is_training_set=True):
     features.to_csv(destination_full_path, index=False)
     print("Featurizer has completed its job and saved the results in a file named '{}'".format(destination_file))
 
+    # TODO: dirty hack to keep track of the features we need in order to drop them from test data set
+    if is_training_set:
+        return features.columns
 
 if __name__ == "__main__":
-    create_features(False)
+
+    # process training data
+    training_features = create_features(True)
+
+    # process test data
+    create_features(False, training_features)
+
