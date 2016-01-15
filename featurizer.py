@@ -12,7 +12,7 @@ import collections
 def create_features(is_training_set=True, training_features=[]):
 
     # set variables
-    directory = "/home/gianluca/Kaggle/airbnb2015/data/"
+    directory = "/Users/grossi/Kaggle/airbnb2015/data/"
     session_file = "sessions.csv"
     if is_training_set:
         user_file = "train_users_2.csv"
@@ -23,7 +23,7 @@ def create_features(is_training_set=True, training_features=[]):
     session_full_path = "".join((directory, session_file))
     user_full_path = "".join((directory, user_file))
     destination_full_path = "".join((directory, destination_file))
-    chunk_size = 10000
+    chunk_size = 100000
 
     # load only 100,000 lines at a time because of memory restrictions (the file weights over 630MB)
     session_data = pd.DataFrame()
@@ -44,9 +44,9 @@ def create_features(is_training_set=True, training_features=[]):
         del chunk_session_data
         print("I've done with chunk {}".format(n))
 
-    # TODO: get rid of this dirty hack
-    # remove all features not used in training
-    session_data = session_data[[training_features]]
+    # hack! exclude from test data set all features not seen in the training set
+    if is_training_set is False and len(training_features) > 1:
+        session_data = session_data[list(training_features)]
 
     # make sure there is one line for each user_id in the final `session_data` data frame
     """
@@ -59,34 +59,44 @@ def create_features(is_training_set=True, training_features=[]):
     non_duplicates_features = session_data[~session_data.user_id.isin(duplicates)]
     session_features = pd.concat([non_duplicates_features, duplicates_features], axis=0)
 
-    # create user features matrix
-    user = pd.read_csv(user_full_path)
-    if is_training_set:
-        user_features = user[["id", "age", "signup_flow", "country_destination"]]
+    # TODO: create features based on the tuple {action, detail}
+    # TODO: create features like number of user sessions, pages per visit, etc...
+
+    # create empty data frame to store user features
+    user_data = pd.read_csv(user_full_path)
+    if is_training_set is True:
+        user_features = user_data[["id", "age", "signup_flow", "country_destination"]]
     else:
-        user_features = user[["id", "age", "signup_flow"]]
+        user_features = user_data[["id", "age", "signup_flow"]]
 
     # TODO: create features out of 'date_account_created', 'timestamp_first_active', 'date_first_booking'
 
-    # add to user feature data frame dummy variables for categorical data
+    # crete dummy variables for categorical user features
     cols = ["gender", "signup_method", "language", "affiliate_channel", "affiliate_provider",
             "first_affiliate_tracked", "signup_app", "first_device_type", "first_browser"]
     for col in cols:
-        dummies = pd.get_dummies(user[col], prefix=col)
+        dummies = pd.get_dummies(user_data[col], prefix=col)
         user_features = pd.concat([user_features, dummies.ix[:, 1:]], axis=1)
 
     # join user session and user features
     features = pd.merge(user_features, session_features, how="inner", left_on="id", right_on="user_id")
     features = features.fillna(0)
-    features.drop("user_id", axis=1, inplace=True)
+    features.drop(["user_id"], axis=1, inplace=True)
+
+    # debug
+    if is_training_set:
+        print("Training set size:", features.shape)
+    else:
+        print("Test set size:", features.shape)
 
     # save output
     features.to_csv(destination_full_path, index=False)
     print("Featurizer has completed its job and saved the results in a file named '{}'".format(destination_file))
 
-    # TODO: dirty hack to keep track of the features we need in order to drop them from test data set
-    if is_training_set:
-        return features.columns
+    # hack! keep track of the features we need in order to drop them from test data set
+    if is_training_set is True:
+        return session_features.columns
+
 
 if __name__ == "__main__":
 
