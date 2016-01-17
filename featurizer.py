@@ -12,7 +12,7 @@ import collections
 def create_features(is_training_set=True, training_features=[]):
 
     # set variables
-    directory = "/Users/grossi/Kaggle/airbnb2015/data/"
+    directory = "./data/"
     session_file = "sessions.csv"
     if is_training_set:
         user_file = "train_users_2.csv"
