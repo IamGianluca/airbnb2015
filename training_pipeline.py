@@ -11,7 +11,7 @@ from sklearn import cross_validation
 def prepare_dataset():
 
     # set variables
-    path = "/Users/grossi/Kaggle/airbnb2015/data/"
+    path = "./data/"
     train_file = "training_features.csv"
     train_full_path = "".join((path, train_file))
     test_file = "test_features.csv"
@@ -51,14 +51,33 @@ def prepare_dataset():
     return X_train, X_test, y_train, ids_test
 
 
+def train_logistic_regression(X_train, y_train):
+    from sklearn.linear_model import LogisticRegression
+
+    """
+    We want to fit 12 logistic regression models to predict each possible outcome: 'US', 'FR', 'CA', 'GB', 'ES', 'IT',
+      'PT', 'NL','DE', 'AU', 'NDF' and 'other'. The general idea is that we want to assess which are the 5 more likely
+      outcomes given the information we have on each user. This will constitute our naive solution for 2nd, 3rd, 4th
+      and 5th guesses. We will then improve the 1st prediction using other non-linear classifiers (decision trees,
+      Random Forest, XGBoost, KNN, NN, etc..)
+    """
+    lr = LogisticRegression(multi_class="multinomial", solver="lbfgs")
+    clf = lr.fit(X_train, y_train)
+
+    scores = cross_validation.cross_val_score(clf, X_train, y_train, cv=5)
+    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+
+    return clf
+
+
 def train_decision_tree(X_train, y_train):
 
     from sklearn import tree
 
     # train decision trees
     # TODO: generally max_depth=3 is a good starting point. Assess if different value could lead to a better CV score
-    clf = tree.DecisionTreeClassifier(max_depth=3)
-    clf = clf.fit(X_train, y_train)
+    tree = tree.DecisionTreeClassifier(max_depth=3)
+    clf = tree.fit(X_train, y_train)
 
     # cross-validation
     scores = cross_validation.cross_val_score(clf, X_train, y_train, cv=5)
