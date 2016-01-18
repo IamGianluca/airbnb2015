@@ -76,7 +76,7 @@ def train_decision_tree(X_train, y_train):
 
     # train decision trees
     # TODO: generally max_depth=3 is a good starting point. Assess if different value could lead to a better CV score
-    tree = tree.DecisionTreeClassifier(max_depth=3)
+    tree = tree.DecisionTreeClassifier(max_depth=3, random_state=23)
     clf = tree.fit(X_train, y_train)
 
     # cross-validation
@@ -90,7 +90,8 @@ def train_random_forest(X_train, y_train):
 
     from sklearn.ensemble import RandomForestClassifier
 
-    clf = RandomForestClassifier(max_depth=5, n_estimators=100, max_features=1)
+    clf = RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=2013, min_samples_leaf=50,
+                                 oob_score=True)
     clf = clf.fit(X_train, y_train)
 
     # cross-validation
