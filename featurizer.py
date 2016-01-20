@@ -33,15 +33,40 @@ def create_features(is_training_set=True, training_features=[]):
         n += 1
         chunk["mins_elapsed"] = chunk.secs_elapsed / 60
 
+        # extract user session count and average number of page visited per session
+        def user_session_count(time_series):
+            sessions = 0
+            for t in time_series:
+                if t > 20:
+                    sessions += 1
+            return sessions
+
+        def median_page_per_visit(time_series):
+            page_per_visit = []
+            pages = 0
+            for t in time_series:
+                if t < 20:
+                    pages += 1
+                else:
+                    page_per_visit.append(pages)
+                    pages = 0
+            return np.median(page_per_visit)
+
+        chunk_user_session_counts = pd.DataFrame({"sessions": chunk.groupby("user_id").mins_elapsed.apply(user_session_count),
+                                      "median_pages_per_visit": chunk.groupby("user_id").mins_elapsed.apply(median_page_per_visit)})
+
         # process session data (transform from long to wide)
         df = pd.DataFrame({"count": chunk.groupby(["user_id", "action"]).action.count()}).reset_index()
-        chunk_session_data = df.pivot(index="user_id", columns="action", values="count").fillna(0).reset_index()
+        chunk_activity_data = df.pivot(index="user_id", columns="action", values="count").fillna(0).reset_index()
 
-        # add `chunk_session_data` to `session_data`
-        session_data = pd.concat([session_data, chunk_session_data], axis=0)
+        # join user session count data with activity data
+        to_concatenate = pd.concat([chunk_activity_data, chunk_user_session_counts], axis=1)
+
+        # concatenate new chunk to existing results
+        session_data = pd.concat([session_data, to_concatenate], axis=0)
 
         # remove chunk_session_data to save memory
-        del chunk_session_data
+        del chunk_activity_data, df, to_concatenate
         print("I've done with chunk {}".format(n))
 
     # hack! exclude from test data set all features not seen in the training set
@@ -62,6 +87,7 @@ def create_features(is_training_set=True, training_features=[]):
     # TODO: create features based on the tuple {action, detail}
     # TODO: create features like number of user sessions, pages per visit, etc...
 
+
     # create empty data frame to store user features
     user_data = pd.read_csv(user_full_path)
     if is_training_set is True:
@@ -69,7 +95,14 @@ def create_features(is_training_set=True, training_features=[]):
     else:
         user_features = user_data[["id", "age", "signup_flow"]]
 
-    # TODO: create features out of 'date_account_created', 'timestamp_first_active', 'date_first_booking'
+    # create features out of 'date_account_created' and 'timestamp_first_active'
+    user_features.loc[:, 'account_created_day'] = pd.to_datetime(user_data.date_account_created).map(lambda x: x.day)
+    user_features.loc[:, 'account_created_month'] = pd.to_datetime(user_data.date_account_created).map(lambda x: x.month)
+    user_features.loc[:, 'account_created_year'] = pd.to_datetime(user_data.date_account_created).map(lambda x: x.year)
+
+    user_features.loc[:, 'account_created_day'] = pd.to_datetime(user_data.timestamp_first_active, format="%Y%m%d%H%M%S").map(lambda x: x.day)
+    user_features.loc[:, 'account_created_month'] = pd.to_datetime(user_data.timestamp_first_active, format="%Y%m%d%H%M%S").map(lambda x: x.month)
+    user_features.loc[:, 'account_created_year'] = pd.to_datetime(user_data.timestamp_first_active, format="%Y%m%d%H%M%S").map(lambda x: x.year)
 
     # crete dummy variables for categorical user features
     cols = ["gender", "signup_method", "language", "affiliate_channel", "affiliate_provider",
