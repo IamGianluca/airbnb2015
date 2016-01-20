@@ -37,25 +37,25 @@ def prepare_dataset():
     y_train = train.country_destination.tolist()
     X_train_full = train.drop(["id", "country_destination"], axis=1).as_matrix()
     ids_test = test.id.tolist()
-    X_test = test.drop(["id"], axis=1).as_matrix()
+    X_test_full = test.drop(["id"], axis=1).as_matrix()
 
     # feature selection; remove all features that are either one or zero (on or off) in more than 80% of the samples
     from sklearn.feature_selection import VarianceThreshold
 
     print("Training set size before feature selection:", X_train_full.shape)
-    print("Test set size before feature selection:", X_test.shape)
+    print("Test set size before feature selection:", X_test_full.shape)
 
     # TODO: try less naive approaches to do features selection
     # feature selection
     sel = VarianceThreshold(threshold=(.8 * (1 - .8)))
     X_train = sel.fit_transform(X_train_full, y_train)
-    X_test = sel.transform(X_test)
+    X_test = sel.transform(X_test_full)
 
     # keep track of the features remaining after the feature selection step
     idxs = sel.get_support(indices=False)
     selected_features = train.drop(["id", "country_destination"], axis=1).columns[idxs].values
 
-    del train, test
+    del train, test, X_train_full, X_test_full
 
     print("Training set size after feature selection:", X_train.shape)
     print("Selected features are:", selected_features)
@@ -66,13 +66,6 @@ def prepare_dataset():
 def train_logistic_regression(X_train, y_train):
     from sklearn.linear_model import LogisticRegression
 
-    """
-    We want to fit 12 logistic regression models to predict each possible outcome: 'US', 'FR', 'CA', 'GB', 'ES', 'IT',
-      'PT', 'NL','DE', 'AU', 'NDF' and 'other'. The general idea is that we want to assess which are the 5 more likely
-      outcomes given the information we have on each user. This will constitute our naive solution for 2nd, 3rd, 4th
-      and 5th guesses. We will then improve the 1st prediction using other non-linear classifiers (decision trees,
-      Random Forest, XGBoost, KNN, NN, etc..)
-    """
     lr = LogisticRegression(multi_class="multinomial", solver="lbfgs")
     clf = lr.fit(X_train, y_train)
 
