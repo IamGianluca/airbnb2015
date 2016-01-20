@@ -13,7 +13,12 @@ def format_output_namefile(fname, fmt='%Y%m%d-%H%M%S_{fname}'):
     return datetime.datetime.now().strftime(fmt).format(fname=fname)
 
 
-def make_predictions(X_test, ids, model, filename="results.csv"):
+def make_predictions(X_test, ids, model, centre=False, filename="results.csv"):
+    # if the model is not scale independent, scale the test dataset
+    if centre is True:
+        from sklearn import preprocessing
+        X_test = preprocessing.scale(X_test)
+
     # predict most likely destination for each user, using decision tree classifier
     predictions = model.predict_proba(X_test)
     probs = pd.DataFrame(predictions, columns=model.classes_, index=ids)
@@ -34,8 +39,9 @@ def make_predictions(X_test, ids, model, filename="results.csv"):
             count += 1
         results[id] = destinations
         n += 1
-        print("Completed:", n, "/", tot)
+        # print("Completed:", n, "/", tot)
 
+    # TODO: there is no need to create a data frame for this. Should output to text file directly from the for loop
     submission = pd.DataFrame(columns=["aid", "country"])
     for key, value in results.items():
         submission = pd.concat([submission, pd.DataFrame({"aid": key, "country": value})])
