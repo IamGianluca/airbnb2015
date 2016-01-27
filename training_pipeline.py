@@ -6,11 +6,9 @@
 
 import pandas as pd
 from sklearn import cross_validation
-import numpy as np
-import time
 
 
-def prepare_dataset():
+def prepare_dataset(t):
 
     # set variables
     path = "./data/"
@@ -23,7 +21,6 @@ def prepare_dataset():
     train = pd.read_csv(train_full_path)
     test = pd.read_csv(test_full_path)
 
-    # TODO: make sure training and test sets have the same number of features (this must be checked in the featurizer flow)
     # remove features in test set which are not present in train set
     not_in_train = [feature for feature in test.columns if feature not in train.columns]
     test = test.drop(not_in_train, axis=1)
@@ -40,14 +37,31 @@ def prepare_dataset():
     X_test_full = test.drop(["id"], axis=1).as_matrix()
 
     # feature selection; remove all features that are either one or zero (on or off) in more than 80% of the samples
-    from sklearn.feature_selection import VarianceThreshold
+    from sklearn.feature_selection import VarianceThreshold, SelectKBest, chi2
 
     print("Training set size before feature selection:", X_train_full.shape)
     print("Test set size before feature selection:", X_test_full.shape)
 
     # TODO: try less naive approaches to do features selection
+    """
+    Using Grid Search we found the best Variance Threshold to be 80-85%. Values above of below result in performance
+    loss. We tested the following values [.50, .60, .70, .80, .85, .90]. The best performance run resulted in the
+    following accuracies value:
+
+    Logistic Regression Accuracy: 0.62 (+/- 0.01)
+    Decision Tree Accuracy: 0.66 (+/- 0.01)
+    Random Forest Accuracy: 0.65 (+/- 0.03)
+
+
+
+    I should read a little bit more into how to perform feature selection before training, in particular the Strong Rule
+    approach proposed by Robert Tibshirani et al. (http://tinyurl.com/hu8lzxn). Chi-square, even though it's a more
+    sophisticated method, doesn't improve performance compared to a variance threshold method. This is to me a bit
+    suspicious.
+    """
     # feature selection
-    sel = VarianceThreshold(threshold=(.8 * (1 - .8)))
+    # sel = VarianceThreshold(threshold=(t * (1 - t)))
+    sel = SelectKBest(chi2, k=t)
     X_train = sel.fit_transform(X_train_full, y_train)
     X_test = sel.transform(X_test_full)
 
@@ -57,6 +71,7 @@ def prepare_dataset():
 
     del train, test, X_train_full, X_test_full
 
+    print("Number of features included:", t)
     print("Training set size after feature selection:", X_train.shape)
     print("Selected features are:", selected_features)
 
@@ -70,7 +85,7 @@ def train_logistic_regression(X_train, y_train):
     clf = lr.fit(X_train, y_train)
 
     scores = cross_validation.cross_val_score(clf, X_train, y_train, cv=5)
-    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+    print("Logistic Regression Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
     return clf
 
@@ -86,22 +101,22 @@ def train_decision_tree(X_train, y_train):
 
     # cross-validation
     scores = cross_validation.cross_val_score(clf, X_train, y_train, cv=5)
-    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+    print("Decision Tree Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
     return clf
 
 
-def train_random_forest(X_train, y_train):
+def train_random_forest(X_train, y_train, msl=50):
 
     from sklearn.ensemble import RandomForestClassifier
 
-    clf = RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=2013, min_samples_leaf=50,
+    clf = RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=2013, min_samples_leaf=msl,
                                  oob_score=True)
     clf = clf.fit(X_train, y_train)
 
     # cross-validation
     scores = cross_validation.cross_val_score(clf, X_train, y_train, cv=5)
-    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+    print("Random Forest Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
     return clf
 
@@ -155,48 +170,6 @@ def train_knn(X_train, y_train):
     # print("KNN Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
     return knn
-
-
-def train_neural_net(X_train, y_train):
-
-    # sigmoid function
-    def nonlin(x, deriv=False):
-        if deriv is True:
-            return x * (1 - x)
-        return 1 / (1 + np.exp(-x))
-
-    # input dataset
-    X = np.array(X_train)
-
-    # output dataset
-    y_dummies = pd.get_dummies(y_train)
-    y = np.array(y_dummies).T
-
-    # seed random numbers to make calculation deterministic (just a good practice)
-    np.random.seed(1)
-
-    # initialize weights randomly with mean 0
-    syn0 = 2 * np.random.random((92, 12)) - 1
-
-    for iter in range(10000):
-
-        # forward propagation
-        l0 = X
-        l1 = nonlin(np.dot(l0, syn0))
-
-        # how much did we miss?
-        l1_error = y.T - l1
-
-        # multiply how much we missed by the slope of the sigmoid at the values in l1
-        l1_delta = l1_error * nonlin(l1, True)
-
-        # update weights
-        syn0 += np.dot(l0.T, l1_delta)
-
-    print("Output After Training:")
-    print(l1)
-
-    return l1
 
 
 
