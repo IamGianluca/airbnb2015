@@ -7,10 +7,30 @@
 import pandas as pd
 import numpy as np
 import collections
+import pickle
+
+
+def user_session_count(time_series):
+    sessions = 0
+    for t in time_series:
+        if t > 20:
+            sessions += 1
+    return sessions
+
+
+def median_page_per_visit(time_series):
+    page_per_visit = []
+    pages = 0
+    for t in time_series:
+        if t < 20:
+            pages += 1
+        else:
+            page_per_visit.append(pages)
+            pages = 0
+    return np.nanmedian(page_per_visit, axis=0)
 
 
 def create_features(is_training_set=True, training_features=[]):
-
     # set variables
     directory = "./data/"
     session_file = "sessions.csv"
@@ -33,60 +53,49 @@ def create_features(is_training_set=True, training_features=[]):
         n += 1
         chunk["mins_elapsed"] = chunk.secs_elapsed / 60
 
-        # extract user session count and average number of page visited per session
-        def user_session_count(time_series):
-            sessions = 0
-            for t in time_series:
-                if t > 20:
-                    sessions += 1
-            return sessions
-
-        def median_page_per_visit(time_series):
-            page_per_visit = []
-            pages = 0
-            for t in time_series:
-                if t < 20:
-                    pages += 1
-                else:
-                    page_per_visit.append(pages)
-                    pages = 0
-            return np.median(page_per_visit)
-
-        chunk_user_session_counts = pd.DataFrame({"sessions": chunk.groupby("user_id").mins_elapsed.apply(user_session_count),
-                                      "median_pages_per_visit": chunk.groupby("user_id").mins_elapsed.apply(median_page_per_visit)})
+        # extract user sessions count and median number of pages browsed per session
+        chunk_user_session_counts = pd.DataFrame({"user_id": chunk.user_id,
+                                                  "sessions": chunk.groupby("user_id").mins_elapsed.apply(user_session_count),
+                                                  "median_pages_per_visit": chunk.groupby("user_id").mins_elapsed.apply(median_page_per_visit)})
+        chunk_user_session_counts.set_index('user_id')
 
         # process session data (transform from long to wide)
-        df = pd.DataFrame({"count": chunk.groupby(["user_id", "action"]).action.count()}).reset_index()
-        chunk_activity_data = df.pivot(index="user_id", columns="action", values="count").fillna(0).reset_index()
+        df = pd.DataFrame({"count": chunk.groupby(["user_id", "action_type", "action_detail", "action"]).action.count()}).reset_index()
+
+        cols = []
+        for i in range(0, len(df)):
+            cols.append(str(df["action"].values[i] + "_" + df["action_type"].values[i] + "_" +
+                            df["action_detail"].values[i]))
+        cols = np.array(cols)
+        df["grouping"] = cols
+
+        df = pd.DataFrame({"count": df.groupby(["user_id", "grouping"])['count'].sum()}).reset_index()
+        chunk_action_data = df.pivot(index="user_id", columns="grouping", values="count").fillna(0)
+        del df
 
         # join user session count data with activity data
-        to_concatenate = pd.concat([chunk_activity_data, chunk_user_session_counts], axis=1)
+        to_concatenate = chunk_action_data.join(chunk_user_session_counts, how="outer")
+        # to_concatenate = pd.concat([chunk_action_data, chunk_user_session_counts], axis=1)
+
+        to_concatenate = to_concatenate.drop_duplicates(keep='first', inplace=False)
+
+        del chunk_action_data, chunk_user_session_counts
 
         # concatenate new chunk to existing results
         session_data = pd.concat([session_data, to_concatenate], axis=0)
+        del to_concatenate
 
-        # remove chunk_session_data to save memory
-        del chunk_activity_data, df, to_concatenate
-        print("I've done with chunk {}".format(n))
+        print("Processed chunk {0}".format(n))
 
     # hack! exclude from test data set all features not seen in the training set
     if is_training_set is False and len(training_features) > 1:
         session_data = session_data[list(training_features)]
 
     # make sure there is one line for each user_id in the final `session_data` data frame
-    """
-    # this method should work but I get into memory troubles on my laptop with just 4GB of RAM
-    session_features = session_data.fillna(0).groupby("user_id")
-    session_features = session_features.apply(np.sum, axis=0)
-    """
     duplicates = [item for item, count in collections.Counter(session_data["user_id"]).items() if count > 1]
     duplicates_features = session_data[session_data.user_id.isin(duplicates)].groupby("user_id").apply(np.sum).drop("user_id", axis=1).reset_index()
     non_duplicates_features = session_data[~session_data.user_id.isin(duplicates)]
     session_features = pd.concat([non_duplicates_features, duplicates_features], axis=0)
-
-    # TODO: create features based on the tuple {action, detail}
-    # TODO: create features like number of user sessions, pages per visit, etc...
-
 
     # create empty data frame to store user features
     user_data = pd.read_csv(user_full_path)
