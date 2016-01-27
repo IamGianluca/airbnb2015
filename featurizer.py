@@ -53,6 +53,20 @@ def create_features(is_training_set=True, training_features=[]):
         n += 1
         chunk["mins_elapsed"] = chunk.secs_elapsed / 60
 
+        # rename and group some similar actions
+        message_features_names = ['10', '11', '12', '15', 'ajax_send_message', 'multi_message',
+                                  'multi_message_attributes', 'update_message', np.NaN]
+        translate_feature_names = ['ajax_google_translate', 'ajax_google_translate_description',
+                                   'ajax_google_translate_reviews']
+        photography_feature_names = ['photography_update', 'request_photography']
+        photo_feature_names = ['ajax_photo_widget', 'ajax_photo_widget_form_iframe']
+        chunk[chunk.loc[:, 'action'].isin(message_features_names)]['action'] = 'message_post'
+        chunk[chunk.loc[:, 'action'].isin(translate_feature_names)]['action'] = 'translate'
+        chunk[chunk.loc[:, 'action'].isin(photo_feature_names)]['action'] = 'photo'
+        chunk[chunk.loc[:, 'action'].isin(['review_news'])]['action'] = 'reviews'
+        chunk[chunk.loc[:, 'action'].isin(['search_results'])]['action'] = 'search'
+        chunk[chunk.loc[:, 'action'].isin(photography_feature_names)]['action'] = 'photography'
+
         # extract user sessions count and median number of pages browsed per session
         chunk_user_session_counts = pd.DataFrame({"user_id": chunk.user_id,
                                                   "sessions": chunk.groupby("user_id").mins_elapsed.apply(user_session_count),
@@ -60,12 +74,12 @@ def create_features(is_training_set=True, training_features=[]):
         chunk_user_session_counts.set_index('user_id')
 
         # process session data (transform from long to wide)
-        df = pd.DataFrame({"count": chunk.groupby(["user_id", "action_type", "action_detail", "action"]).action.count()}).reset_index()
+        df = pd.DataFrame({"count": chunk.groupby(["user_id", "action"]).action.count()}).reset_index()
 
         cols = []
         for i in range(0, len(df)):
-            cols.append(str(df["action"].values[i] + "_" + df["action_type"].values[i] + "_" +
-                            df["action_detail"].values[i]))
+            cols.append(str(df["action"].values[i])) # + "_" + df["action_type"].values[i] + "_" +
+                            # df["action_detail"].values[i]))
         cols = np.array(cols)
         df["grouping"] = cols
 
@@ -75,8 +89,6 @@ def create_features(is_training_set=True, training_features=[]):
 
         # join user session count data with activity data
         to_concatenate = chunk_action_data.join(chunk_user_session_counts, how="outer")
-        # to_concatenate = pd.concat([chunk_action_data, chunk_user_session_counts], axis=1)
-
         to_concatenate = to_concatenate.drop_duplicates(keep='first', inplace=False)
 
         del chunk_action_data, chunk_user_session_counts
