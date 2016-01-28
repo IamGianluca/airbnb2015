@@ -30,20 +30,25 @@ def median_page_per_visit(time_series):
     return np.nanmedian(page_per_visit, axis=0)
 
 
-def create_features(is_training_set=True, training_features=[]):
+def create_features(is_training_set=True):
     # set variables
     directory = "./data/"
     session_file = "sessions.csv"
-    if is_training_set:
+    if is_training_set is True:
         user_file = "train_users_2.csv"
-        destination_file = "training_features.csv"
+        destination_file = "training_features.pickle"
     else:
         user_file = "test_users.csv"
-        destination_file = "test_features.csv"
+        destination_file = "test_features.pickle"
     session_full_path = "".join((directory, session_file))
     user_full_path = "".join((directory, user_file))
     destination_full_path = "".join((directory, destination_file))
     chunk_size = 100000
+
+    # hack! exclude from test data set all features not seen in the training set
+    if is_training_set is False:
+        with open('feature_names.pickle', 'rb') as f:
+            training_features = pickle.load(f)
 
     # load only 100,000 lines at a time because of memory restrictions (the file weights over 630MB)
     session_data = pd.DataFrame()
@@ -60,12 +65,12 @@ def create_features(is_training_set=True, training_features=[]):
                                    'ajax_google_translate_reviews']
         photography_feature_names = ['photography_update', 'request_photography']
         photo_feature_names = ['ajax_photo_widget', 'ajax_photo_widget_form_iframe']
-        chunk[chunk.loc[:, 'action'].isin(message_features_names)]['action'] = 'message_post'
-        chunk[chunk.loc[:, 'action'].isin(translate_feature_names)]['action'] = 'translate'
-        chunk[chunk.loc[:, 'action'].isin(photo_feature_names)]['action'] = 'photo'
-        chunk[chunk.loc[:, 'action'].isin(['review_news'])]['action'] = 'reviews'
-        chunk[chunk.loc[:, 'action'].isin(['search_results'])]['action'] = 'search'
-        chunk[chunk.loc[:, 'action'].isin(photography_feature_names)]['action'] = 'photography'
+        chunk[chunk.loc[:, 'action'].isin(message_features_names)].loc['action'] = 'message_post'
+        chunk[chunk.loc[:, 'action'].isin(translate_feature_names)].loc['action'] = 'translate'
+        chunk[chunk.loc[:, 'action'].isin(photo_feature_names)].loc['action'] = 'photo'
+        chunk[chunk.loc[:, 'action'].isin(['review_news'])].loc['action'] = 'reviews'
+        chunk[chunk.loc[:, 'action'].isin(['search_results'])].loc['action'] = 'search'
+        chunk[chunk.loc[:, 'action'].isin(photography_feature_names)].loc['action'] = 'photography'
 
         # extract user sessions count and median number of pages browsed per session
         chunk_user_session_counts = pd.DataFrame({"user_id": chunk.user_id,
@@ -99,7 +104,9 @@ def create_features(is_training_set=True, training_features=[]):
 
         print("Processed chunk {0}".format(n))
 
-    # hack! exclude from test data set all features not seen in the training set
+        if n == 10:
+            break
+
     if is_training_set is False and len(training_features) > 1:
         session_data = session_data[list(training_features)]
 
@@ -135,7 +142,7 @@ def create_features(is_training_set=True, training_features=[]):
     # join user session and user features
     features = pd.merge(user_features, session_features, how="inner", left_on="id", right_on="user_id")
     features = features.fillna(0)
-    features.drop(["user_id"], axis=1, inplace=True)
+    # features.drop(["user_id"], axis=1, inplace=True)
 
     # debug
     if is_training_set:
@@ -144,12 +151,16 @@ def create_features(is_training_set=True, training_features=[]):
         print("Test set size:", features.shape)
 
     # save output
-    features.to_csv(destination_full_path, index=False)
-    print("Featurizer has completed its job and saved the results in a file named '{}'".format(destination_file))
-
-    # hack! keep track of the features we need in order to drop them from test data set
     if is_training_set is True:
-        return session_features.columns
+        with open(destination_full_path, 'wb') as f:
+            pickle.dump(features, f)
+        feature_names = session_features.columns
+        with open('feature_names.pickle', 'wb') as f:
+            pickle.dump(feature_names, f)
+    else:
+        with open(destination_full_path, 'wb') as f:
+            pickle.dump(features, f)
+    print("Featurizer has completed its job and saved the results in a file named '{}'".format(destination_file))
 
 
 if __name__ == "__main__":
@@ -159,4 +170,3 @@ if __name__ == "__main__":
 
     # process test data
     create_features(False, training_features)
-
