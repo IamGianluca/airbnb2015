@@ -161,7 +161,7 @@ def train_decision_tree(X, y):
     param_grid = {'max_depth': [3, 4, 5, 6, 10]}
     CV_tree = GridSearchCV(estimator=tree, param_grid=param_grid, cv=5)
     CV_tree.fit(X_train, y_train)
-    print(CV_tree.best_params_)
+    print('Decision tree classifier best parameters:', CV_tree.best_params_)
 
     # normalized discounted cumulative gain
     predictions = format_predictions(X_test, CV_tree)

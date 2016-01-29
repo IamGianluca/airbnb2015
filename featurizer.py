@@ -104,9 +104,6 @@ def create_features(is_training_set=True):
 
         print("Processed chunk {0}".format(n))
 
-        if n == 10:
-            break
-
     if is_training_set is False and len(training_features) > 1:
         session_data = session_data[list(training_features)]
 
@@ -128,9 +125,12 @@ def create_features(is_training_set=True):
     user_features.loc[:, 'account_created_month'] = pd.to_datetime(user_data.date_account_created).map(lambda x: x.month)
     user_features.loc[:, 'account_created_year'] = pd.to_datetime(user_data.date_account_created).map(lambda x: x.year)
 
-    user_features.loc[:, 'account_created_day'] = pd.to_datetime(user_data.timestamp_first_active, format="%Y%m%d%H%M%S").map(lambda x: x.day)
-    user_features.loc[:, 'account_created_month'] = pd.to_datetime(user_data.timestamp_first_active, format="%Y%m%d%H%M%S").map(lambda x: x.month)
-    user_features.loc[:, 'account_created_year'] = pd.to_datetime(user_data.timestamp_first_active, format="%Y%m%d%H%M%S").map(lambda x: x.year)
+    user_features.loc[:, 'account_created_day'] = pd.to_datetime(user_data.timestamp_first_active,
+                                                                 format="%Y%m%d%H%M%S").map(lambda x: x.day)
+    user_features.loc[:, 'account_created_month'] = pd.to_datetime(user_data.timestamp_first_active,
+                                                                   format="%Y%m%d%H%M%S").map(lambda x: x.month)
+    user_features.loc[:, 'account_created_year'] = pd.to_datetime(user_data.timestamp_first_active,
+                                                                  format="%Y%m%d%H%M%S").map(lambda x: x.year)
 
     # crete dummy variables for categorical user features
     cols = ["gender", "signup_method", "language", "affiliate_channel", "affiliate_provider",
@@ -140,8 +140,12 @@ def create_features(is_training_set=True):
         user_features = pd.concat([user_features, dummies.ix[:, 1:]], axis=1)
 
     # join user session and user features
-    features = pd.merge(user_features, session_features, how="inner", left_on="id", right_on="user_id")
+    # TODO: check we are not leaving out training samples
+    print('uf', user_features.shape, user_features.id[:5])
+    print('sf', session_features.shape, session_features.user_id[:5])
+    features = pd.merge(user_features, session_features, how="outer", left_on="id", right_on="user_id")
     features = features.fillna(0)
+    print('afs', features.shape)
     # features.drop(["user_id"], axis=1, inplace=True)
 
     # debug
@@ -161,12 +165,3 @@ def create_features(is_training_set=True):
         with open(destination_full_path, 'wb') as f:
             pickle.dump(features, f)
     print("Featurizer has completed its job and saved the results in a file named '{}'".format(destination_file))
-
-
-if __name__ == "__main__":
-
-    # process training data
-    training_features = create_features(True)
-
-    # process test data
-    create_features(False, training_features)
