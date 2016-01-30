@@ -4,64 +4,14 @@
 @title: Training pipeline
 """
 
-import pandas as pd
+
+from evaluation_metric import ndcg_n, format_predictions
 from sklearn import cross_validation
-import numpy as np
-import math
+
 import pickle
 
 
-def ndcg_n(predictions, truth, k=5):
-    # idcg = [1.0, 0.6309297535714575, 0.5, 0.43067655807339306, 0.38685280723454163]
-    users = predictions.id.unique()
-    ndcg = []
-    n = 0
-    for user in users:
-        res = []
-        guesses = predictions[predictions.id == user]['country'].reset_index(drop=True)
-        observed = truth[n]
-        for i in range(0, k, 1):
-            if guesses.loc[i] == observed:
-                rel = 1
-            else:
-                rel = 0
-            nom = math.pow(2, rel) - 1
-            den = math.log2(i+2)
-            inter = nom / den
-            res.append(inter)
-        ndcg.append(sum(res))
-        n += 1
-    return np.mean(ndcg)
-
-
-def format_predictions(X_test, model):
-    predictions = model.predict_proba(X_test)
-    try:
-        probs = pd.DataFrame(predictions, columns=model.classes_)
-    except:
-        probs = pd.DataFrame(predictions, columns=model.best_estimator_.classes_)
-
-    # select top 5 destinations for each user
-    results = {}
-    for idx in probs.index:
-        row = probs.iloc[idx, :]
-        destinations = []
-        count = 0
-        while count < 5:
-            destination = row.idxmax(axis=1)
-            destinations.append(destination)
-            row.drop(destination, inplace=True, axis=0)
-            count += 1
-        results[idx] = destinations
-
-    submission = pd.DataFrame(columns=["id", "country"])
-    for key, value in results.items():
-        submission = pd.concat([submission, pd.DataFrame({"id": key, "country": value})])
-
-    return submission
-
-
-def prepare_dataset(t):
+def prepare_dataset():
     # set variables
     path = "./data/"
     train_file = "training_features.pickle"
@@ -102,7 +52,7 @@ def prepare_dataset(t):
     method, doesn't improve performance compared to a variance threshold method. This is to me a bit suspicious (?)
     """
     # feature selection
-    sel = SelectKBest(chi2, k=t)
+    sel = SelectKBest(chi2, k=150)
     train_ids, test_ids = X_train_before_feature_selection[:, 0], X_test_before_feature_selection[:, 0]
     X_train = sel.fit_transform(X_train_before_feature_selection[:, 1:], y_train)
     X_test = sel.transform(X_test_before_feature_selection[:, 1:])
@@ -134,8 +84,12 @@ def train_logistic_regression(X, y):
     from sklearn.cross_validation import train_test_split
 
     # train - test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=395)
 
+    # TODO: separate feature selection step
+
+    # fit logistic regression
+    # TODO: Lasso regularization
     lr = LogisticRegression(multi_class="multinomial", solver="lbfgs")
     clf = lr.fit(X_train, y_train)
 
@@ -154,9 +108,11 @@ def train_decision_tree(X, y):
     from sklearn.cross_validation import train_test_split
 
     # train - test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=1093)
 
-    # train decision tree
+    # TODO: separate feature selection step
+
+    # fit decision tree
     tree = tree.DecisionTreeClassifier(random_state=23)
     param_grid = {'max_depth': [3, 4, 5, 6, 10]}
     CV_tree = GridSearchCV(estimator=tree, param_grid=param_grid, cv=5)
@@ -178,9 +134,11 @@ def train_random_forest(X, y):
     from sklearn.cross_validation import train_test_split
 
     # train - test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=357)
 
-    # train random forest classifier
+    # TODO: separate feature selection step
+
+    # fit random forest classifier
     rfc = RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=2013, oob_score=True)
     param_grid = {
         'n_estimators': [1000, 2000],
