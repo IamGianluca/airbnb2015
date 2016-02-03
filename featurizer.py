@@ -67,12 +67,13 @@ def create_features(is_training_set=True):
                                    'ajax_google_translate_reviews']
         photography_feature_names = ['photography_update', 'request_photography']
         photo_feature_names = ['ajax_photo_widget', 'ajax_photo_widget_form_iframe']
-        chunk[chunk.loc[:, 'action'].isin(message_features_names)].loc['action'] = 'message_post'
-        chunk[chunk.loc[:, 'action'].isin(translate_feature_names)].loc['action'] = 'translate'
-        chunk[chunk.loc[:, 'action'].isin(photo_feature_names)].loc['action'] = 'photo'
-        chunk[chunk.loc[:, 'action'].isin(['review_news'])].loc['action'] = 'reviews'
-        chunk[chunk.loc[:, 'action'].isin(['search_results'])].loc['action'] = 'search'
-        chunk[chunk.loc[:, 'action'].isin(photography_feature_names)].loc['action'] = 'photography'
+        chunk.loc[chunk.action.isin(message_features_names), 'action'] = 'message_post'
+        chunk.loc[chunk.action.isin(translate_feature_names), 'action'] = 'translate'
+        chunk.loc[chunk.action.isin(photo_feature_names), 'action'] = 'photo'
+        chunk.loc[chunk.action.isin(['review_news']), 'action'] = 'reviews'
+        chunk.loc[chunk.action.isin(['search_results']), 'action'] = 'search'
+        chunk.loc[chunk.action.isin(photography_feature_names), 'action'] = 'photography'
+        chunk.loc[chunk.action.isin(['view', 'views']), 'action'] = 'views'
 
         # extract user sessions count and median number of pages browsed per session
         chunk_user_session_counts = pd.DataFrame({"user_id": chunk.user_id,
