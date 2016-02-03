@@ -7,11 +7,13 @@
 
 from evaluation_metric import ndcg_n, format_predictions
 from sklearn import cross_validation
-
 import pickle
 
 
 def prepare_dataset():
+    # TODO: optimise this parameter for each model
+    t = 150
+
     # set variables
     path = "./data/"
     train_file = "training_features.pickle"
@@ -36,6 +38,14 @@ def prepare_dataset():
 
     # separate outcome from independent variables
     y_train = train.country_destination.tolist()
+
+    # dumb training and test user ids
+    train_ids, test_ids = train.id, test.id
+    with open('./data/training_ids.pickle', 'wb') as f:
+        pickle.dump(train_ids, f)
+    with open('./data/test_ids.pickle', 'wb') as f:
+        pickle.dump(test_ids, f)
+
     # TODO: there should be either user_id or id, not both! This must be addressed in the featurizer flow
     X_train_before_feature_selection = train.drop(['user_id', 'id', 'country_destination'], axis=1).as_matrix()
     X_test_before_feature_selection = test.drop(['user_id', 'id'], axis=1).as_matrix()
@@ -52,8 +62,7 @@ def prepare_dataset():
     method, doesn't improve performance compared to a variance threshold method. This is to me a bit suspicious (?)
     """
     # feature selection
-    sel = SelectKBest(chi2, k=150)
-    train_ids, test_ids = X_train_before_feature_selection[:, 0], X_test_before_feature_selection[:, 0]
+    sel = SelectKBest(chi2, k=t)
     X_train = sel.fit_transform(X_train_before_feature_selection[:, 1:], y_train)
     X_test = sel.transform(X_test_before_feature_selection[:, 1:])
     del X_train_before_feature_selection, X_test_before_feature_selection
@@ -68,11 +77,7 @@ def prepare_dataset():
     print("Training set size after feature selection:", X_train.shape)
     print("Selected features are:", selected_features)
 
-    # write ids for training and test set
-    with open('./data/training_ids.pickle', 'wb') as f:
-        pickle.dump(train_ids, f)
-    with open('./data/test_ids.pickle', 'wb') as f:
-        pickle.dump(test_ids, f)
+    # write features which passed the feature selection step
     with open('./data/selected_features.pickle', 'wb') as f:
         pickle.dump(selected_features, f)
 
