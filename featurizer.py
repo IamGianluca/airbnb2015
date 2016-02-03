@@ -4,6 +4,7 @@
 @title: Feature Engineering pipeline
 """
 
+
 import pandas as pd
 import numpy as np
 import collections
@@ -59,6 +60,7 @@ def create_features(is_training_set=True):
         chunk["mins_elapsed"] = chunk.secs_elapsed / 60
 
         # rename and group some similar actions
+        # TODO: make sure this works as expected
         message_features_names = ['10', '11', '12', '15', 'ajax_send_message', 'multi_message',
                                   'multi_message_attributes', 'update_message', np.NaN]
         translate_feature_names = ['ajax_google_translate', 'ajax_google_translate_description',
@@ -83,8 +85,7 @@ def create_features(is_training_set=True):
 
         cols = []
         for i in range(0, len(df)):
-            cols.append(str(df["action"].values[i])) # + "_" + df["action_type"].values[i] + "_" +
-                            # df["action_detail"].values[i]))
+            cols.append(str(df["action"].values[i]))
         cols = np.array(cols)
         df["grouping"] = cols
 
@@ -125,11 +126,11 @@ def create_features(is_training_set=True):
     user_features.loc[:, 'account_created_month'] = pd.to_datetime(user_data.date_account_created).map(lambda x: x.month)
     user_features.loc[:, 'account_created_year'] = pd.to_datetime(user_data.date_account_created).map(lambda x: x.year)
 
-    user_features.loc[:, 'account_created_day'] = pd.to_datetime(user_data.timestamp_first_active,
+    user_features.loc[:, 'first_active_day'] = pd.to_datetime(user_data.timestamp_first_active,
                                                                  format="%Y%m%d%H%M%S").map(lambda x: x.day)
-    user_features.loc[:, 'account_created_month'] = pd.to_datetime(user_data.timestamp_first_active,
+    user_features.loc[:, 'first_active_month'] = pd.to_datetime(user_data.timestamp_first_active,
                                                                    format="%Y%m%d%H%M%S").map(lambda x: x.month)
-    user_features.loc[:, 'account_created_year'] = pd.to_datetime(user_data.timestamp_first_active,
+    user_features.loc[:, 'first_active_year'] = pd.to_datetime(user_data.timestamp_first_active,
                                                                   format="%Y%m%d%H%M%S").map(lambda x: x.year)
 
     # crete dummy variables for categorical user features
