@@ -39,13 +39,6 @@ def prepare_dataset():
     # separate outcome from independent variables
     y_train = train.country_destination.tolist()
 
-    # dumb training and test user ids
-    train_ids, test_ids = train.id, test.id
-    with open('./data/training_ids.pickle', 'wb') as f:
-        pickle.dump(train_ids, f)
-    with open('./data/test_ids.pickle', 'wb') as f:
-        pickle.dump(test_ids, f)
-
     # TODO: there should be either user_id or id, not both! This must be addressed in the featurizer flow
     X_train_before_feature_selection = train.drop(['user_id', 'id', 'country_destination'], axis=1).as_matrix()
     X_test_before_feature_selection = test.drop(['user_id', 'id'], axis=1).as_matrix()
@@ -89,21 +82,20 @@ def train_logistic_regression(X, y):
     from sklearn.cross_validation import train_test_split
 
     # train - test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=395)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10)
 
     # TODO: separate feature selection step
 
     # fit logistic regression
-    # TODO: Lasso regularization
-    lr = LogisticRegression(multi_class="multinomial", solver="lbfgs")
-    clf = lr.fit(X_train, y_train)
+    lr = LogisticRegression(multi_class='multinomial', solver='lbfgs', penalty='l2')
+    lr.fit(X_train, y_train)
 
     # normalized discounted cumulative gain
-    predictions = format_predictions(X_test, clf)
+    predictions = format_predictions(X_test, lr)
     ndcg = ndcg_n(predictions, y_test)
-    print('Logistic regression classifier NDCG (on test set): : {0:.2f}'.format(ndcg))
+    print('Logistic regression classifier NDCG (on test set): : {0:.4f}'.format(ndcg))
 
-    return clf
+    return lr
 
 
 def train_decision_tree(X, y):
@@ -113,13 +105,13 @@ def train_decision_tree(X, y):
     from sklearn.cross_validation import train_test_split
 
     # train - test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=1093)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10)
 
     # TODO: separate feature selection step
 
     # fit decision tree
-    tree = tree.DecisionTreeClassifier(random_state=23)
-    param_grid = {'max_depth': [3, 4, 5, 6, 10]}
+    tree = tree.DecisionTreeClassifier()
+    param_grid = {'max_depth': [3, 5, 7, 9]}
     CV_tree = GridSearchCV(estimator=tree, param_grid=param_grid, cv=5)
     CV_tree.fit(X_train, y_train)
     print('Decision tree classifier best parameters:', CV_tree.best_params_)
@@ -139,14 +131,13 @@ def train_random_forest(X, y):
     from sklearn.cross_validation import train_test_split
 
     # train - test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=357)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10)
 
     # TODO: separate feature selection step
 
     # fit random forest classifier
-    rfc = RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=2013, oob_score=True)
+    rfc = RandomForestClassifier(n_estimators=2000, n_jobs=-1, oob_score=True)
     param_grid = {
-        'n_estimators': [1000, 2000],
         'max_features': ['auto', 'sqrt', 'log2'],
         'min_samples_leaf': [20, 35, 50]
     }
@@ -174,7 +165,7 @@ def train_svm(X_train, y_train):
 
     # fit svm
     # we tried also a linear kernel but it was too slow and didn't show any performance improvement
-    svc = SVC(kernel="rbf", probability=True, decision_function_shape="ovr", shrinking=True, random_state=16)
+    svc = SVC(kernel="rbf", probability=True, decision_function_shape="ovr", shrinking=True)
     svc = svc.fit(X_train_c, y_train)
 
     # cross-validation
