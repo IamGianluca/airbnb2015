@@ -5,6 +5,7 @@
 """
 
 import pandas as pd
+import numpy as np
 import datetime
 import pickle
 
@@ -25,21 +26,26 @@ def make_predictions(test_set, model, centre=False, filename="results.csv"):
 
     # predict most likely destination for each user, using decision tree classifier
     predictions = model.predict_proba(test_set)
-    probs = pd.DataFrame(predictions, columns=model.classes_, index=ids)
+    try:
+        probs = pd.DataFrame(predictions, columns=model.classes_, index=ids)
+    except:
+        probs = pd.DataFrame(predictions, columns=model.best_estimator_.classes_, index=ids)
 
     # TODO: this should be a function, need refactoring
     # select top 5 destinations for each user
     results = {}
+    n = 1
+    tot = len(probs.index)
     for idx in probs.index:
-        row = probs.iloc[idx]
+        row = probs[probs.index == idx]
         destinations = []
-        count = 0
-        while count < 5:
-            destination = row.idxmax(axis=1)
+        for i in np.arange(0, 5):
+            destination = row.idxmax(axis=1).values[0]
             destinations.append(destination)
-            row.drop(destination, inplace=True, axis=0)
-            count += 1
+            row = row.drop(destination, axis=1)
         results[idx] = destinations
+        # print('Formulated predictions for user', n, '/', tot)
+        n += 1
 
     # TODO: there is no need to create a data frame for this. Should output to text file directly from the for loop
     submission = pd.DataFrame(columns=["aid", "country"])

@@ -46,7 +46,9 @@ def create_features(is_training_set=True):
     destination_full_path = "".join((directory, destination_file))
     chunk_size = 100000
 
-    # hack! exclude from test data set all features not seen in the training set
+    # TODO; transform continuous data in log space and proportion data (zero to one values) in logit space
+
+    # load feature names from training dataset; we will exclude from test data all features not seen in the training set
     if is_training_set is False:
         with open('feature_names.pickle', 'rb') as f:
             training_features = pickle.load(f)
@@ -60,13 +62,17 @@ def create_features(is_training_set=True):
         chunk["mins_elapsed"] = chunk.secs_elapsed / 60
 
         # rename and group some similar actions
-        # TODO: make sure this works as expected
         message_features_names = ['10', '11', '12', '15', 'ajax_send_message', 'multi_message',
                                   'multi_message_attributes', 'update_message', np.NaN]
         translate_feature_names = ['ajax_google_translate', 'ajax_google_translate_description',
                                    'ajax_google_translate_reviews']
         photography_feature_names = ['photography_update', 'request_photography']
+        hosting_reviews_feature_names = ['this_hosting_reviews', 'this_hosting_reviews_3000']
         photo_feature_names = ['ajax_photo_widget', 'ajax_photo_widget_form_iframe']
+        terms_feature_names = ['terms', 'terms_and_conditions']
+        transaction_history_feature_names = ['transaction_history', 'transaction_history_paginated']
+        travel_plans_feature_names = ['travel_plans_current', 'travel_plans_previous']
+
         chunk.loc[chunk.action.isin(message_features_names), 'action'] = 'message_post'
         chunk.loc[chunk.action.isin(translate_feature_names), 'action'] = 'translate'
         chunk.loc[chunk.action.isin(photo_feature_names), 'action'] = 'photo'
@@ -74,6 +80,10 @@ def create_features(is_training_set=True):
         chunk.loc[chunk.action.isin(['search_results']), 'action'] = 'search'
         chunk.loc[chunk.action.isin(photography_feature_names), 'action'] = 'photography'
         chunk.loc[chunk.action.isin(['view', 'views']), 'action'] = 'views'
+        chunk.loc[chunk.action.isin(hosting_reviews_feature_names), 'action'] = 'this_hosting_reviews'
+        chunk.loc[chunk.action.isin(terms_feature_names), 'action'] = 'terms_and_conditions'
+        chunk.loc[chunk.action.isin(transaction_history_feature_names), 'action'] = 'transaction_history'
+        chunk.loc[chunk.action.isin(travel_plans_feature_names), 'action'] = 'travel_plans'
 
         # extract user sessions count and median number of pages browsed per session
         chunk_user_session_counts = pd.DataFrame({"user_id": chunk.user_id,
@@ -117,6 +127,7 @@ def create_features(is_training_set=True):
 
     # create empty data frame to store user features
     user_data = pd.read_csv(user_full_path)
+
     if is_training_set is True:
         user_features = user_data[["id", "age", "signup_flow", "country_destination"]]
     else:
@@ -141,22 +152,30 @@ def create_features(is_training_set=True):
         dummies = pd.get_dummies(user_data[col], prefix=col)
         user_features = pd.concat([user_features, dummies.ix[:, 1:]], axis=1)
 
-    # join user session and user features
-    # TODO: check we are not leaving out training samples
-    print('uf', user_features.shape, user_features.id[:5])
-    print('sf', session_features.shape, session_features.user_id[:5])
-    features = pd.merge(user_features, session_features, how="outer", left_on="id", right_on="user_id")
+    # join user session and user features; train only on complete cases but score also users who don't have session
+    #   data if that's possible
+    if is_training_set is True:
+        features = pd.merge(user_features, session_features, how="inner", left_on="id", right_on="user_id")
+    else:
+        features = pd.merge(user_features, session_features, how="left", left_on="id", right_on="user_id")
     features = features.fillna(0)
-    print('afs', features.shape)
-    # features.drop(["user_id"], axis=1, inplace=True)
 
-    # debug
-    if is_training_set:
+    # make sure we are not leaving out training and test samples
+    if is_training_set is True:
         print("Training set size:", features.shape)
+        # assert len(features.index) == 213451
     else:
         print("Test set size:", features.shape)
+        assert len(features.index) == 62096
 
-    # save output
+    # save output and sorted ids as they will become useful at the predicting stage
+    if is_training_set is True:
+        id_name_file = './data/training_ids.pickle'
+    else:
+        id_name_file = './data/test_ids.pickle'
+    with open(id_name_file, 'wb') as f:
+        pickle.dump(features.user_id, f)
+
     if is_training_set is True:
         with open(destination_full_path, 'wb') as f:
             pickle.dump(features, f)
@@ -166,4 +185,4 @@ def create_features(is_training_set=True):
     else:
         with open(destination_full_path, 'wb') as f:
             pickle.dump(features, f)
-    print("Featurizer has completed its job and saved the results in a file named '{}'".format(destination_file))
+    print("Featurizer has completed its job and saved the results in '{}'".format(destination_file))
