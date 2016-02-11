@@ -11,8 +11,6 @@ import math
 
 
 def ndcg_n(predictions, truth, k=5):
-    # TODO: validate results using leaderboard and manual computations
-    # idcg = [1.0, 0.6309297535714575, 0.5, 0.43067655807339306, 0.38685280723454163]
     users = predictions.id.unique()
     ndcg = []
     n = 0
